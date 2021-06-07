@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
+	"unicode/utf8"
 
 	"github.com/gorilla/mux"
 )
@@ -49,18 +50,21 @@ func articlesStoreHandler(w http.ResponseWriter, r *http.Request) {
 
 	errors := make(map[string]string)
 
+	//验证标题
 	if title == "" {
 		errors["title"] = "标题不能为空"
-	} else if len(title) < 3 || len(title) > 40 {
+	} else if utf8.RuneCountInString(title) < 3 || utf8.RuneCountInString(title) > 40 {
 		errors["title"] = "标题长度介于3-40"
 	}
 
+	//验证内容
 	if body == "" {
 		errors["body"] = "内容不能为空"
 	} else if len(body) < 10 {
 		errors["body"] = "内容长度大于10"
 	}
 
+	//检查是否有错误
 	if len(errors) == 0 {
 		fmt.Fprint(w, "验证内容通过！<br>")
 		fmt.Fprintf(w, "title 的值为: %v <br>", title)
@@ -103,10 +107,12 @@ func articlesStoreHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			panic(err)
 		}
+
 		template.Execute(w, data)
 	}
 }
 
+//创建表单
 func articlesCreateHandler(w http.ResponseWriter, r *http.Request) {
 	html := `
 	<!DOCTYPE html>
@@ -115,7 +121,7 @@ func articlesCreateHandler(w http.ResponseWriter, r *http.Request) {
 		<title>创建文章 —— 我的技术博客</title>
 	</head>
 	<body>
-		<form action="%s?test=data" method="post">
+		<form action="%s" method="post">
 			<p><input type="text" name="title"></p>
 			<p><textarea name="body" cols="30" rows="10"></textarea></p>
 			<p><button type="submit">提交</button></p>
