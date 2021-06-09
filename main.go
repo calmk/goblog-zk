@@ -4,14 +4,59 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"text/template"
 	"unicode/utf8"
 
+	"database/sql"
+	"log"
+	"time"
+
+	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 )
 
 var router = mux.NewRouter()
+var db *sql.DB
+
+type Aritcles struct {
+	Title, Body string
+	ID          int64
+}
+
+func initDB() {
+	var err error
+	config := mysql.Config{
+		User:                 "root",
+		Passwd:               "zhaokai1103.",
+		Addr:                 "127.0.0.1:3306",
+		DBName:               "goblog",
+		Net:                  "tcp",
+		AllowNativePasswords: true,
+	}
+
+	db, err = sql.Open("mysql", config.FormatDSN())
+	fmt.Printf("%s\n", config.FormatDSN())
+	checkError(err)
+
+	// 设置最大连接数
+	db.SetMaxOpenConns(25)
+	// 设置最大空闲连接数
+	db.SetMaxIdleConns(25)
+	// 设置每个链接的过期时间
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	// 尝试连接，失败会报错
+	//err = db.Ping()
+	//checkError(err)
+}
+
+func checkError(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 type ArticlesFormatData struct {
 	Titie, Body string
@@ -37,11 +82,55 @@ func notFoundHandler(w http.ResponseWriter, r *http.Request) {
 func articlesShowHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
-	fmt.Fprint(w, "文章 ID："+id+"\n")
+
+	article := Aritcles{}
+	query := "SELECT * FROM articles WHERE id = ?"
+	err := db.QueryRow(query, id).Scan(&article.ID, &article.Title, &article.Body)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, "404 文章未找到")
+		} else {
+			checkError(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "500 服务器内部错误")
+		}
+	} else {
+		tmpl, err := template.ParseFiles("resources/views/articles/show.gohtml")
+		checkError(err)
+
+		tmpl.Execute(w, article)
+	}
 }
 
 func articlesIndexHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "请提供正确的数据！")
+}
+
+func saveArticlesToDB(title string, body string) (int64, error) {
+	var (
+		id   int64
+		err  error
+		rs   sql.Result
+		stmt *sql.Stmt
+	)
+
+	stmt, err = db.Prepare("INSERT INTO articles (title, body) VALUES(?,?)")
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	rs, err = stmt.Exec(title, body)
+	if err != nil {
+		return 0, err
+	}
+
+	if id, err = rs.LastInsertId(); id > 0 {
+		return id, nil
+	}
+
+	return 0, err
 }
 
 func articlesStoreHandler(w http.ResponseWriter, r *http.Request) {
@@ -66,34 +155,16 @@ func articlesStoreHandler(w http.ResponseWriter, r *http.Request) {
 
 	//检查是否有错误
 	if len(errors) == 0 {
-		fmt.Fprint(w, "验证内容通过！<br>")
-		fmt.Fprintf(w, "title 的值为: %v <br>", title)
-		fmt.Fprintf(w, "title 的长度为: %v <br>", len(title))
-		fmt.Fprintf(w, "body 的值为: %v <br>", body)
-		fmt.Fprintf(w, "body 的长度为: %v <br>", len(body))
+		lastInsertId, err := saveArticlesToDB(title, body)
+		if lastInsertId > 0 {
+			fmt.Fprint(w, "Insert success. Id:"+strconv.FormatInt(lastInsertId, 10))
+		} else {
+			checkError(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "500 服务器内部错误.")
+		}
 	} else {
-		html := `
-		<!DOCTYPE html>
-		<html lang="en">
-		<head>
-			<title>创建文章 —— 我的技术博客</title>
-			<style type="text/css">.error {color: red;}</style>
-		</head>
-		<body>
-			<form action="{{ .URL }}" method="post">
-				<p><input type="text" name="title" value="{{ .Title }}"></p>
-				{{ with .Errors.title }}
-				<p class="error">{{ . }}</p>
-				{{ end }}
-				<p><textarea name="body" cols="30" rows="10">{{ .Body }}</textarea></p>
-				{{ with .Errors.body }}
-				<p class="error">{{ . }}</p>
-				{{ end }}
-				<p><button type="submit">提交</button></p>
-			</form>
-		</body>
-		</html>
-		`
+
 		storeURL, _ := router.Get("articles.store").URL()
 
 		data := ArticlesFormatData{
@@ -103,7 +174,7 @@ func articlesStoreHandler(w http.ResponseWriter, r *http.Request) {
 			Errors: errors,
 		}
 
-		template, err := template.New("creare-form").Parse(html)
+		template, err := template.ParseFiles("resources/views/articles/create.gohtml")
 		if err != nil {
 			panic(err)
 		}
@@ -114,23 +185,22 @@ func articlesStoreHandler(w http.ResponseWriter, r *http.Request) {
 
 //创建表单
 func articlesCreateHandler(w http.ResponseWriter, r *http.Request) {
-	html := `
-	<!DOCTYPE html>
-	<html lang="en">
-	<head>
-		<title>创建文章 —— 我的技术博客</title>
-	</head>
-	<body>
-		<form action="%s" method="post">
-			<p><input type="text" name="title"></p>
-			<p><textarea name="body" cols="30" rows="10"></textarea></p>
-			<p><button type="submit">提交</button></p>
-		</form>
-	</body>
-	</html>
-	`
+
 	storeURL, _ := router.Get("articles.store").URL()
-	fmt.Fprintf(w, html, storeURL)
+	data := ArticlesFormatData{
+		Titie:  "",
+		Body:   "",
+		URL:    storeURL,
+		Errors: nil,
+	}
+
+	tmpl, err := template.ParseFiles("resources/views/articles/create.gohtml")
+	if err != nil {
+		panic(err)
+	}
+
+	tmpl.Execute(w, data)
+	//fmt.Fprintf(w, html, storeURL)
 }
 
 func forceHTMLMiddleware(next http.Handler) http.Handler {
@@ -150,7 +220,20 @@ func removeTrailingSlash(next http.Handler) http.Handler {
 	})
 }
 
+func createTables() {
+	createArticlesSQL := `CREATE TABLE IF NOT EXISTS articles(
+		id bigint(20) PRIMARY KEY AUTO_INCREMENT NOT NULL,
+		title varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+		body longtext COLLATE utf8mb4_unicode_ci
+	);`
+
+	_, err := db.Exec(createArticlesSQL)
+	checkError(err)
+}
+
 func main() {
+	initDB()
+	createTables()
 
 	router.HandleFunc("/", homeHandler).Methods("GET").Name("home")
 	router.HandleFunc("/about", aboutHandler).Methods("GET").Name("about")
