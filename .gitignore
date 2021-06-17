@@ -3,4 +3,3 @@ main
 .gitignore
 go.sum
 .vscode
-go.mod
