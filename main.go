@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"goblogZK/pkg/route"
-	"goblogZK/pkg/logger"
+	"goblogCalmk/pkg/logger"
+	"goblogCalmk/pkg/route"
 	"net/http"
 	"net/url"
 	"strconv"
