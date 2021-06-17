@@ -1,6 +1,6 @@
 tmp
-go.mod
 main
-.vscode
 .gitignore
 go.sum
+.vscode
+go.mod
