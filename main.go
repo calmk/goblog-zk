@@ -1,18 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"goblogCalmk/bootstrap"
 	"goblogCalmk/pkg/database"
 	"goblogCalmk/pkg/logger"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
-	"text/template"
-	"unicode/utf8"
-
-	"database/sql"
 
 	"github.com/gorilla/mux"
 )
