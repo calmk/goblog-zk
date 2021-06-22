@@ -17,13 +17,6 @@ import (
 type ArticlesController struct {
 }
 
-// ArticlesFormData 创建博文表单数据
-type ArticlesFormData struct {
-	Title, Body string
-	URL         string
-	Errors      map[string]string
-}
-
 func (*ArticlesController) Show(w http.ResponseWriter, r *http.Request) {
 	id := route.GetRouteVariable("id", r)
 
@@ -64,9 +57,15 @@ func (*ArticlesController) Index(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ArticlesFormData 创建博文表单数据
+type ArticlesFormData struct {
+	Title, Body string
+	URL         string
+	Errors      map[string]string
+}
+
 // Create 文章创建页面
 func (*ArticlesController) Create(w http.ResponseWriter, r *http.Request) {
-
 	storeURL := route.Name2URL("articles.store")
 	data := ArticlesFormData{
 		Title:  "",
@@ -74,8 +73,6 @@ func (*ArticlesController) Create(w http.ResponseWriter, r *http.Request) {
 		URL:    storeURL,
 		Errors: nil,
 	}
-	fmt.Println(storeURL)
-
 	tmpl, err := template.ParseFiles("resources/views/articles/create.gohtml")
 	if err != nil {
 		panic(err)
@@ -122,7 +119,7 @@ func (*ArticlesController) Store(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, "插入成功，ID 为"+strconv.FormatInt(_article.ID, 10))
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "500 服务器内部错误")
+			fmt.Fprint(w, "创建文章失败，请联系管理员")
 		}
 	} else {
 

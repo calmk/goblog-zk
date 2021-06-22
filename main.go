@@ -31,32 +31,6 @@ type ArticlesFormatData struct {
 	Errors      map[string]string
 }
 
-func saveArticlesToDB(title string, body string) (int64, error) {
-	var (
-		id   int64
-		err  error
-		rs   sql.Result
-		stmt *sql.Stmt
-	)
-
-	stmt, err = db.Prepare("INSERT INTO articles (title, body) VALUES(?,?)")
-	if err != nil {
-		return 0, err
-	}
-	defer stmt.Close()
-
-	rs, err = stmt.Exec(title, body)
-	if err != nil {
-		return 0, err
-	}
-
-	if id, err = rs.LastInsertId(); id > 0 {
-		return id, nil
-	}
-
-	return 0, err
-}
-
 func getArticleByID(id string) (Aritcles, error) {
 	article := Aritcles{}
 	query := "select * from articles where id = ?"
@@ -242,6 +216,7 @@ func main() {
 	router.HandleFunc("/articles/{id:[0-9]+}/edit", articlesEditHandler).Methods("GET").Name("articles.edit")
 	router.HandleFunc("/articles/{id:[0-9]+}", articlesUpdateHandler).Methods("POST").Name("articles.update")
 	router.HandleFunc("/articles/{id:[0-9]+}/delete", articlesDeleteHandler).Methods("POST").Name("articles.delete")
+	//router.HandleFunc("/articles/create", articlesCreateHandler).Methods("GET").Name("articles.create")
 
 	router.Use(forceHTMLMiddleware)
 
