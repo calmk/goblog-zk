@@ -1,6 +1,7 @@
 package article
 
 import (
+	"goblogCalmk/app/models"
 	"goblogCalmk/pkg/model"
 	"goblogCalmk/pkg/route"
 	"goblogCalmk/pkg/types"
@@ -8,7 +9,8 @@ import (
 )
 
 type Article struct {
-	ID    int64
+	models.BaseModel
+
 	Title string
 	Body  string
 }
@@ -32,5 +34,5 @@ func GetAll() ([]Article, error) {
 }
 
 func (a Article) Link() string {
-	return route.Name2URL("articles.show", "id", strconv.FormatInt(a.ID, 10))
+	return route.Name2URL("articles.show", "id", strconv.FormatInt(int64(a.BaseModel.ID), 10))
 }
